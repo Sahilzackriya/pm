@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type FormEvent } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -15,9 +15,15 @@ import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
 
+const AUTH_USERNAME = "user";
+const AUTH_PASSWORD = "password";
+
 export const KanbanBoard = () => {
   const [board, setBoard] = useState<BoardData>(() => initialData);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [authForm, setAuthForm] = useState({ username: "", password: "" });
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -89,7 +95,88 @@ export const KanbanBoard = () => {
     });
   };
 
+  const handleLogin = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (
+      authForm.username.trim() === AUTH_USERNAME &&
+      authForm.password === AUTH_PASSWORD
+    ) {
+      setIsAuthenticated(true);
+      setAuthError(null);
+      return;
+    }
+
+    setAuthError("Invalid username or password.");
+  };
+
+  const handleLogout = () => {
+    setIsAuthenticated(false);
+    setAuthForm({ username: "", password: "" });
+    setAuthError(null);
+  };
+
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
+
+  if (!isAuthenticated) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-xl items-center justify-center px-6 py-12">
+        <div className="w-full rounded-[32px] border border-[var(--stroke)] bg-white/90 p-10 shadow-[var(--shadow)]">
+          <h1 className="text-3xl font-semibold text-[var(--navy-dark)]">
+            Sign in to Kanban Studio
+          </h1>
+          <p className="mt-3 text-sm text-[var(--gray-text)]">
+            Use the hardcoded credentials to access the board.
+          </p>
+          <form onSubmit={handleLogin} className="mt-8 space-y-4">
+            <label className="block text-sm font-semibold text-[var(--navy-dark)]">
+              Username
+              <input
+                value={authForm.username}
+                onChange={(event) =>
+                  setAuthForm((prev) => ({
+                    ...prev,
+                    username: event.target.value,
+                  }))
+                }
+                className="mt-2 w-full rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm outline-none"
+                placeholder="user"
+                aria-label="Username"
+                required
+              />
+            </label>
+            <label className="block text-sm font-semibold text-[var(--navy-dark)]">
+              Password
+              <input
+                type="password"
+                value={authForm.password}
+                onChange={(event) =>
+                  setAuthForm((prev) => ({
+                    ...prev,
+                    password: event.target.value,
+                  }))
+                }
+                className="mt-2 w-full rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm outline-none"
+                placeholder="password"
+                aria-label="Password"
+                required
+              />
+            </label>
+            {authError ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {authError}
+              </div>
+            ) : null}
+            <button
+              type="submit"
+              className="w-full rounded-full bg-[var(--secondary-purple)] px-4 py-3 text-sm font-semibold uppercase tracking-wide text-white transition hover:brightness-110"
+            >
+              Sign in
+            </button>
+          </form>
+        </div>
+      </main>
+    );
+  }
 
   return (
     <div className="relative overflow-hidden">
@@ -111,13 +198,22 @@ export const KanbanBoard = () => {
                 and capture quick notes without getting buried in settings.
               </p>
             </div>
-            <div className="rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-5 py-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
-                Focus
-              </p>
-              <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
-                One board. Five columns. Zero clutter.
-              </p>
+            <div className="flex items-center justify-between rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-5 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
+                  Focus
+                </p>
+                <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
+                  One board. Five columns. Zero clutter.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="rounded-full border border-[var(--stroke)] bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--navy-dark)] transition hover:bg-[var(--surface)]"
+              >
+                Logout
+              </button>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-4">

@@ -4,14 +4,40 @@ import { KanbanBoard } from "@/components/KanbanBoard";
 
 const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
 
+const signIn = async (username: string, password: string) => {
+  await userEvent.type(screen.getByLabelText(/username/i), username);
+  await userEvent.type(screen.getByLabelText(/password/i), password);
+  await userEvent.click(screen.getByRole("button", { name: /sign in/i }));
+};
+
 describe("KanbanBoard", () => {
-  it("renders five columns", () => {
+  it("shows login screen before authentication", () => {
     render(<KanbanBoard />);
+    expect(screen.getByRole("heading", { name: /sign in to kanban studio/i })).toBeInTheDocument();
+    expect(screen.queryByTestId(/column-/i)).not.toBeInTheDocument();
+  });
+
+  it("rejects invalid credentials", async () => {
+    render(<KanbanBoard />);
+    await signIn("invalid", "invalid");
+    expect(screen.getByText(/invalid username or password/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /sign in to kanban studio/i })).toBeInTheDocument();
+  });
+
+  it("allows a user to sign in and then logout", async () => {
+    render(<KanbanBoard />);
+    await signIn("user", "password");
+
+    expect(screen.getByText(/kanban studio/i)).toBeInTheDocument();
     expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+
+    await userEvent.click(screen.getByRole("button", { name: /logout/i }));
+    expect(screen.getByRole("heading", { name: /sign in to kanban studio/i })).toBeInTheDocument();
   });
 
   it("renames a column", async () => {
     render(<KanbanBoard />);
+    await signIn("user", "password");
     const column = getFirstColumn();
     const input = within(column).getByLabelText("Column title");
     await userEvent.clear(input);
@@ -21,6 +47,7 @@ describe("KanbanBoard", () => {
 
   it("adds and removes a card", async () => {
     render(<KanbanBoard />);
+    await signIn("user", "password");
     const column = getFirstColumn();
     const addButton = within(column).getByRole("button", {
       name: /add a card/i,
