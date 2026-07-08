@@ -3,15 +3,21 @@ import os
 import sqlite3
 import urllib.request
 from pathlib import Path
+from typing import Literal
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
+from backend.ai_board import BoardData, build_ai_messages, parse_ai_response
 from backend.auth import verify_credentials, create_session_token
 from backend.database import init_db, get_db, seed_initial_board
-from backend.openrouter import OPENROUTER_MODEL, OpenRouterError, ask_openrouter
+from backend.openrouter import (
+    OPENROUTER_MODEL,
+    OpenRouterError,
+    ask_openrouter_messages,
+)
 
 # ============================================================================
 # Request/Response Models
@@ -34,13 +40,22 @@ class BoardUpdateRequest(BaseModel):
     cards: dict
 
 
+class ChatHistoryItem(BaseModel):
+    role: Literal["user", "assistant"]
+    content: str
+
+
 class ChatRequest(BaseModel):
     message: str
+    history: list[ChatHistoryItem] = Field(default_factory=list)
+    user_id: str = "user-default"
 
 
 class ChatResponse(BaseModel):
     response: str
     model: str
+    board_updated: bool
+    board: BoardData | None
 
 
 # ============================================================================
@@ -168,17 +183,52 @@ def update_board(request: BoardUpdateRequest, user_id: str = "user-default") -> 
 
 @app.post("/api/chat")
 def chat(request: ChatRequest) -> ChatResponse:
-    """Send a simple chat prompt to OpenRouter."""
+    """Ask OpenRouter about the current board and persist valid updates."""
     message = request.message.strip()
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
 
+    conn = get_db()
     try:
-        response = ask_openrouter(message)
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT board_data FROM boards WHERE user_id = ?", (request.user_id,)
+        )
+        row = cursor.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Board not found")
+
+        current_board = BoardData.model_validate_json(row[0])
+        messages = build_ai_messages(
+            message,
+            [item.model_dump() for item in request.history],
+            current_board,
+        )
+        content = ask_openrouter_messages(messages, structured=True)
+        parsed = parse_ai_response(content, current_board)
+
+        if parsed.board is not None:
+            cursor.execute(
+                """
+                UPDATE boards SET board_data = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE user_id = ?
+                """,
+                (parsed.board.model_dump_json(), request.user_id),
+            )
+            conn.commit()
     except OpenRouterError as error:
         raise HTTPException(status_code=502, detail=str(error)) from error
+    except ValueError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+    finally:
+        conn.close()
 
-    return ChatResponse(response=response, model=OPENROUTER_MODEL)
+    return ChatResponse(
+        response=parsed.response,
+        model=OPENROUTER_MODEL,
+        board_updated=parsed.board is not None,
+        board=parsed.board,
+    )
 
 
 # ============================================================================

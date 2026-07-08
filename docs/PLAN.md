@@ -165,10 +165,10 @@ Implementation decisions:
 
 Goal: Send board JSON and user question to AI, then apply structured updates.
 
-- [ ] Include current board state and conversation history in AI requests.
-- [ ] Define structured output with response text plus optional board changes.
-- [ ] Parse structured responses safely in the backend.
-- [ ] Add tests for response parsing and update application.
+- [x] Include current board state and conversation history in AI requests.
+- [x] Define structured output with response text plus optional board changes.
+- [x] Parse structured responses safely in the backend.
+- [x] Add tests for response parsing and update application.
 
 Tests:
 - Unit tests for structured output parsing.
@@ -177,6 +177,23 @@ Tests:
 Success criteria:
 - AI responses can update the board.
 - Updates apply without breaking state.
+
+Implementation decisions:
+- Keep `POST /api/chat` as the single AI endpoint. It accepts `message`, optional
+  `history`, and the MVP `user_id`.
+- The backend loads the current board from SQLite rather than trusting a board
+  supplied by the browser.
+- OpenRouter receives a system instruction, conversation history, and the current
+  board JSON, with JSON response mode enabled.
+- Structured output contains a user-facing `response` and either a complete
+  replacement `board` or `null` when no change is needed.
+- Before persistence, Pydantic validation requires unique fixed column IDs, matching
+  card keys and IDs, and every card to appear exactly once in a column.
+- AI updates may rename columns and create, edit, move, or delete cards, but cannot
+  add, remove, reorder, or replace the fixed columns.
+- Invalid AI output returns `502` and leaves the stored board unchanged.
+- Live structured-response validation passed with `openai/gpt-oss-120b`; the full
+  backend suite passes with 22 tests.
 
 ## Part 10: AI chat sidebar
 

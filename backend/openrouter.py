@@ -40,12 +40,16 @@ def get_openrouter_api_key() -> str:
     return api_key
 
 
-def ask_openrouter(message: str) -> str:
+def ask_openrouter_messages(
+    messages: list[dict[str, str]], structured: bool = False
+) -> str:
     payload = {
         "model": OPENROUTER_MODEL,
-        "messages": [{"role": "user", "content": message}],
+        "messages": messages,
         "temperature": 0,
     }
+    if structured:
+        payload["response_format"] = {"type": "json_object"}
     request = urllib.request.Request(
         OPENROUTER_URL,
         data=json.dumps(payload).encode("utf-8"),
@@ -78,3 +82,7 @@ def ask_openrouter(message: str) -> str:
         raise OpenRouterError("OpenRouter returned an empty response")
 
     return content.strip()
+
+
+def ask_openrouter(message: str) -> str:
+    return ask_openrouter_messages([{"role": "user", "content": message}])
