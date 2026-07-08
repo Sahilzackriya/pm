@@ -4,14 +4,14 @@
 
 Goal: Turn the outline into an executable delivery plan with clear substeps, acceptance criteria, and test requirements.
 
-- [ ] Review current frontend demo and confirm component responsibilities.
-- [ ] Create `frontend/AGENTS.md` describing the current frontend code, tests, and next work.
-- [ ] Define unit and integration testing goals:
+- [x] Review current frontend demo and confirm component responsibilities.
+- [x] Create `frontend/AGENTS.md` describing the current frontend code, tests, and next work.
+- [x] Define unit and integration testing goals:
   - Frontend unit coverage: target ~80% where it is sensible.
   - Avoid adding tests only to hit a coverage number; prioritize valuable behavior coverage.
   - Robust integration coverage: core app flows end to end.
-- [ ] Confirm technology choices: Next.js frontend, FastAPI backend, SQLite persistence, Docker packaging, OpenRouter AI.
-- [ ] Get user sign-off on the plan before implementation.
+- [x] Confirm technology choices: Next.js frontend, FastAPI backend, SQLite persistence, Docker packaging, OpenRouter AI.
+- [x] Get user sign-off on the plan before implementation.
 
 Success criteria:
 - `docs/PLAN.md` includes actionable substeps for all major phases.
@@ -22,11 +22,11 @@ Success criteria:
 
 Goal: Add backend and Docker scaffolding, then verify the app can serve a static page.
 
-- [ ] Add `backend/` FastAPI skeleton.
-- [ ] Add Dockerfile and container config.
-- [ ] Add `scripts/` start/stop scripts for Windows, macOS, and Linux.
-- [ ] Verify a static `Hello world` page is served from the backend.
-- [ ] Confirm the frontend build can be served from the backend.
+- [x] Add `backend/` FastAPI skeleton.
+- [x] Add Dockerfile and container config.
+- [x] Add `scripts/` start/stop scripts for Windows, macOS, and Linux.
+- [x] Verify a static `Hello world` page is served from the backend.
+- [x] Confirm the frontend build can be served from the backend.
 
 Tests:
 - Backend unit test for a sample health endpoint.
@@ -40,11 +40,11 @@ Success criteria:
 
 Goal: Serve the existing Next.js Kanban demo from the backend and verify the UI.
 
-- [ ] Build the frontend statically.
-- [ ] Configure backend to serve the built frontend.
-- [ ] Verify `/` loads the Kanban board.
-- [ ] Add frontend unit tests for components and helper utilities.
-- [ ] Add integration tests for page load and core UI behavior.
+- [x] Build the frontend statically.
+- [x] Configure backend to serve the built frontend.
+- [x] Verify `/` loads the Kanban board.
+- [x] Add frontend unit tests for components and helper utilities.
+- [x] Add integration tests for page load and core UI behavior.
 
 Tests:
 - Vitest coverage for `KanbanBoard`, `KanbanColumn`, `KanbanCard`, `NewCardForm`, and `kanban` helpers where it adds value.
@@ -59,11 +59,11 @@ Success criteria:
 
 Goal: Require hardcoded auth before showing the Kanban board.
 
-- [ ] Add login screen and auth state.
-- [ ] Validate credentials against `user` / `password`.
-- [ ] Add logout support.
-- [ ] Protect the board until auth succeeds.
-- [ ] Add tests for auth flow.
+- [x] Add login screen and auth state.
+- [x] Validate credentials against `user` / `password`.
+- [x] Add logout support.
+- [x] Protect the board until auth succeeds.
+- [x] Add tests for auth flow.
 
 Tests:
 - Unit tests for login UI and auth state.
@@ -78,10 +78,10 @@ Success criteria:
 
 Goal: Document a SQLite schema for persistent Kanban state.
 
-- [ ] Design schema for users, boards, columns, cards, and order metadata.
-- [ ] Consider JSON storage for board state to simplify early MVP persistence.
-- [ ] Document the schema and reasoning in `docs/`.
-- [ ] Confirm support for one board per user and future multi-user work.
+- [x] Design schema for users, boards, columns, cards, and order metadata.
+- [x] Consider JSON storage for board state to simplify early MVP persistence.
+- [x] Document the schema and reasoning in `docs/`.
+- [x] Confirm support for one board per user and future multi-user work.
 
 Tests:
 - Schema validation through backend unit tests.
@@ -95,10 +95,10 @@ Success criteria:
 
 Goal: Add API routes to read and update the Kanban board.
 
-- [ ] Implement auth route and board GET/POST or PATCH routes.
-- [ ] Ensure the database is created if it does not exist.
-- [ ] Add backend unit tests for API behavior.
-- [ ] Validate API contract with realistic board payloads.
+- [x] Implement auth route and board GET/PATCH routes.
+- [x] Ensure the database is created if it does not exist.
+- [x] Add backend unit tests for API behavior.
+- [x] Validate API contract with realistic board payloads.
 
 Tests:
 - Backend tests for auth, board read, board update, and persistence.
@@ -112,10 +112,10 @@ Success criteria:
 
 Goal: Wire the frontend to the backend API for persistent Kanban state.
 
-- [ ] Replace local-only board state with API load and update flows.
-- [ ] Sync rename, add card, delete card, and drag/drop moves.
-- [ ] Add loading and error handling.
-- [ ] Add frontend API integration tests.
+- [x] Replace local-only board state with API load and update flows.
+- [x] Sync rename, add card, delete card, and drag/drop moves.
+- [x] Add loading and error handling.
+- [x] Add frontend API integration tests.
 
 Tests:
 - Unit tests for client helpers and state synchronization.
@@ -124,6 +124,15 @@ Tests:
 Success criteria:
 - Board state persists across reloads.
 - UI and backend stay in sync.
+
+Implementation notes:
+- Frontend API calls use `/api` by default and `NEXT_PUBLIC_API_BASE_URL` for local Next.js development against FastAPI.
+- The signed-in MVP user is restored from `sessionStorage` so browser refresh can reload the persisted board instead of returning to login.
+- Board saves are debounced and only begin after the initial API board load completes, preventing the frontend sample state from overwriting persisted data.
+- Board API requests encode `user_id` query parameters.
+- FastAPI allows CORS from `http://127.0.0.1:3000` and `http://localhost:3000` for local frontend development.
+- Playwright starts both FastAPI and Next.js for integration tests. It uses `PM_DB_PATH=frontend/test-results/e2e.db` so e2e tests do not modify the main `pm.db`.
+- Playwright can use an installed browser channel with `PLAYWRIGHT_BROWSER_CHANNEL=chrome` when the managed Playwright browser is not installed.
 
 ## Part 8: AI connectivity
 
@@ -187,7 +196,8 @@ Success criteria:
 
 ## Current frontend context
 
-- Existing app is a Next.js demo with `KanbanBoard`, `KanbanColumn`, `KanbanCard`, `KanbanCardPreview`, and `NewCardForm`.
+- Existing app is a Next.js Kanban app with `KanbanBoard`, `KanbanColumn`, `KanbanCard`, `KanbanCardPreview`, and `NewCardForm`.
 - Shared board state logic lives in `src/lib/kanban.ts`.
-- Existing frontend test file covers render, rename, add, and delete flows.
-- Playwright is configured to run against a local dev server.
+- API helpers live in `src/lib/api.ts` and call the FastAPI auth and board endpoints.
+- Frontend tests cover login, session restore, board loading, rename, add, delete, API helpers, and persistence after reload.
+- Playwright is configured to run the Next.js dev server and FastAPI backend together for integration tests.
