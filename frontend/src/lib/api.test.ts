@@ -73,10 +73,10 @@ describe("API client", () => {
         json: async () => mockBoardData,
       });
 
-      const result = await getBoard("user-123");
+      const result = await getBoard("user 123");
 
       expect(global.fetch).toHaveBeenCalledWith(
-        "/api/boards?user_id=user-123"
+        "/api/boards?user_id=user%20123"
       );
       expect(result).toEqual(mockBoardData);
     });
@@ -102,10 +102,10 @@ describe("API client", () => {
         json: async () => ({ success: true }),
       });
 
-      const result = await updateBoard("user-123", mockBoardData);
+      const result = await updateBoard("user 123", mockBoardData);
 
       expect(global.fetch).toHaveBeenCalledWith(
-        "/api/boards?user_id=user-123",
+        "/api/boards?user_id=user%20123",
         expect.objectContaining({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },

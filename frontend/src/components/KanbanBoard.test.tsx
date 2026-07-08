@@ -19,6 +19,7 @@ const signIn = async (username: string, password: string) => {
 describe("KanbanBoard", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    window.sessionStorage.clear();
     // Mock successful API responses
     (api.signIn as any).mockResolvedValue({
       user_id: "user-default",
@@ -60,6 +61,21 @@ describe("KanbanBoard", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /logout/i }));
     expect(screen.getByRole("heading", { name: /sign in to kanban studio/i })).toBeInTheDocument();
+    expect(window.sessionStorage.getItem("pm-auth")).toBeNull();
+  });
+
+  it("restores the signed-in user after a page reload", async () => {
+    window.sessionStorage.setItem(
+      "pm-auth",
+      JSON.stringify({ user_id: "user-default", username: "user" })
+    );
+
+    render(<KanbanBoard />);
+
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+    expect(api.getBoard).toHaveBeenCalledWith("user-default");
   });
 
   it("renames a column", async () => {

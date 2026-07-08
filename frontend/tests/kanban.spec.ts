@@ -30,23 +30,33 @@ test("adds a card to a column", async ({ page }) => {
 });
 
 test("persists board state across page reload", async ({ page }) => {
+  const cardTitle = `Persistent card ${Date.now()}`;
+
   // Sign in and add a card
   await login(page);
   const firstColumn = page.locator('[data-testid^="column-"]').first();
   await firstColumn.getByRole("button", { name: /add a card/i }).click();
-  await firstColumn.getByPlaceholder("Card title").fill("Persistent card");
+  await firstColumn.getByPlaceholder("Card title").fill(cardTitle);
   await firstColumn.getByPlaceholder("Details").fill("Should persist after reload.");
+  const saveResponse = page.waitForResponse(
+    (response) =>
+      response.url().includes("/api/boards") &&
+      response.request().method() === "PATCH"
+  );
   await firstColumn.getByRole("button", { name: /add card/i }).click();
-  
-  // Wait for sync
-  await page.waitForTimeout(1000);
+
+  await expect((await saveResponse).ok()).toBe(true);
+  await expect(page.getByText("Synced")).toBeVisible();
   
   // Reload page
   await page.reload();
   
   // Verify card still exists
-  await expect(firstColumn.getByText("Persistent card")).toBeVisible();
-  await expect(firstColumn.getByText("Should persist after reload.")).toBeVisible();
+  const persistedCard = firstColumn
+    .locator('[data-testid^="card-"]')
+    .filter({ hasText: cardTitle });
+  await expect(persistedCard).toBeVisible();
+  await expect(persistedCard.getByText("Should persist after reload.")).toBeVisible();
 });
 
 test("moves a card between columns", async ({ page }) => {

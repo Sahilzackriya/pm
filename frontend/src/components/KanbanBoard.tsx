@@ -21,8 +21,12 @@ import {
   type ApiError,
 } from "@/lib/api";
 
-const AUTH_USERNAME = "user";
-const AUTH_PASSWORD = "password";
+const AUTH_STORAGE_KEY = "pm-auth";
+
+type StoredAuth = {
+  user_id: string;
+  username: string;
+};
 
 export const KanbanBoard = () => {
   const [board, setBoard] = useState<BoardData>(() => initialData);
@@ -34,6 +38,7 @@ export const KanbanBoard = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [apiError, setApiError] = useState<string | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [hasLoadedBoard, setHasLoadedBoard] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -42,6 +47,23 @@ export const KanbanBoard = () => {
   );
 
   const cardsById = useMemo(() => board.cards, [board.cards]);
+
+  useEffect(() => {
+    const storedAuth = window.sessionStorage.getItem(AUTH_STORAGE_KEY);
+    if (!storedAuth) {
+      return;
+    }
+
+    try {
+      const parsedAuth = JSON.parse(storedAuth) as StoredAuth;
+      if (parsedAuth.user_id) {
+        setUserId(parsedAuth.user_id);
+        setIsAuthenticated(true);
+      }
+    } catch {
+      window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
+    }
+  }, []);
 
   // Load board from API when userId becomes available
   useEffect(() => {
@@ -53,8 +75,10 @@ export const KanbanBoard = () => {
       try {
         setIsLoading(true);
         setApiError(null);
+        setHasLoadedBoard(false);
         const loadedBoard = await apiGetBoard(userId);
         setBoard(loadedBoard);
+        setHasLoadedBoard(true);
       } catch (error) {
         const apiErr = error as ApiError;
         setApiError(apiErr.message || "Failed to load board");
@@ -68,7 +92,7 @@ export const KanbanBoard = () => {
 
   // Sync board changes to API
   useEffect(() => {
-    if (!userId || !isAuthenticated || isLoading) {
+    if (!userId || !isAuthenticated || isLoading || !hasLoadedBoard) {
       return;
     }
 
@@ -86,7 +110,7 @@ export const KanbanBoard = () => {
     }, 500);
 
     return () => clearTimeout(syncTimer);
-  }, [board, userId, isAuthenticated, isLoading]);
+  }, [board, userId, isAuthenticated, isLoading, hasLoadedBoard]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveCardId(event.active.id as string);
@@ -158,6 +182,13 @@ export const KanbanBoard = () => {
     try {
       setIsLoading(true);
       const response = await apiSignIn(authForm.username, authForm.password);
+      window.sessionStorage.setItem(
+        AUTH_STORAGE_KEY,
+        JSON.stringify({
+          user_id: response.user_id,
+          username: response.username,
+        })
+      );
       setUserId(response.user_id);
       setIsAuthenticated(true);
       setAuthForm({ username: "", password: "" });
@@ -175,7 +206,9 @@ export const KanbanBoard = () => {
     setAuthForm({ username: "", password: "" });
     setAuthError(null);
     setApiError(null);
+    setHasLoadedBoard(false);
     setBoard(initialData);
+    window.sessionStorage.removeItem(AUTH_STORAGE_KEY);
   };
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;

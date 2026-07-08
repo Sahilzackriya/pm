@@ -11,7 +11,7 @@ export type ApiError = {
   status: number;
 };
 
-const API_BASE = "/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 
 async function handleResponse(response: Response) {
   if (!response.ok) {
@@ -49,7 +49,9 @@ export async function signIn(
 }
 
 export async function getBoard(userId: string): Promise<BoardData> {
-  const response = await fetch(`${API_BASE}/boards?user_id=${userId}`);
+  const response = await fetch(
+    `${API_BASE}/boards?user_id=${encodeURIComponent(userId)}`
+  );
   return handleResponse(response);
 }
 
@@ -57,14 +59,17 @@ export async function updateBoard(
   userId: string,
   board: BoardData
 ): Promise<{ success: boolean }> {
-  const response = await fetch(`${API_BASE}/boards?user_id=${userId}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      columns: board.columns,
-      cards: board.cards,
-    }),
-  });
+  const response = await fetch(
+    `${API_BASE}/boards?user_id=${encodeURIComponent(userId)}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        columns: board.columns,
+        cards: board.cards,
+      }),
+    }
+  );
 
   return handleResponse(response);
 }

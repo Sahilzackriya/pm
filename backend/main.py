@@ -5,6 +5,7 @@ import urllib.request
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 
@@ -40,6 +41,13 @@ class BoardUpdateRequest(BaseModel):
 init_db()
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://127.0.0.1:3000", "http://localhost:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # location where a static export would live if present
 STATIC_DIR = Path(__file__).resolve().parents[1] / "frontend" / "out"

@@ -2,9 +2,17 @@
 
 import sqlite3
 import json
+import os
 from pathlib import Path
 
-DB_PATH = Path(__file__).parent.parent / "pm.db"
+_db_path = os.environ.get("PM_DB_PATH")
+DB_PATH = (
+    _db_path
+    if _db_path == ":memory:"
+    else Path(_db_path)
+    if _db_path
+    else Path(__file__).parent.parent / "pm.db"
+)
 
 # Shared in-memory connection for testing
 _test_conn = None
@@ -22,7 +30,9 @@ def get_db() -> sqlite3.Connection:
         return _test_conn
     
     # Normal file-based connection
-    conn = sqlite3.connect(str(DB_PATH))
+    db_path = Path(DB_PATH)
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
     return conn
 
