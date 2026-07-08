@@ -1,6 +1,12 @@
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, within, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { KanbanBoard } from "@/components/KanbanBoard";
+import * as api from "@/lib/api";
+import { initialData } from "@/lib/kanban";
+
+// Mock the API module
+vi.mock("@/lib/api");
 
 const getFirstColumn = () => screen.getAllByTestId(/column-/i)[0];
 
@@ -11,6 +17,18 @@ const signIn = async (username: string, password: string) => {
 };
 
 describe("KanbanBoard", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Mock successful API responses
+    (api.signIn as any).mockResolvedValue({
+      user_id: "user-default",
+      username: "user",
+      token: "token-123",
+    });
+    (api.getBoard as any).mockResolvedValue(initialData);
+    (api.updateBoard as any).mockResolvedValue({ success: true });
+  });
+
   it("shows login screen before authentication", () => {
     render(<KanbanBoard />);
     expect(screen.getByRole("heading", { name: /sign in to kanban studio/i })).toBeInTheDocument();
@@ -18,9 +36,16 @@ describe("KanbanBoard", () => {
   });
 
   it("rejects invalid credentials", async () => {
+    (api.signIn as any).mockRejectedValueOnce({
+      status: 401,
+      message: "Invalid credentials",
+    });
     render(<KanbanBoard />);
     await signIn("invalid", "invalid");
-    expect(screen.getByText(/invalid username or password/i)).toBeInTheDocument();
+    
+    await waitFor(() => {
+      expect(screen.getByText(/invalid credentials/i)).toBeInTheDocument();
+    });
     expect(screen.getByRole("heading", { name: /sign in to kanban studio/i })).toBeInTheDocument();
   });
 
@@ -28,7 +53,9 @@ describe("KanbanBoard", () => {
     render(<KanbanBoard />);
     await signIn("user", "password");
 
-    expect(screen.getByText(/kanban studio/i)).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /kanban studio/i })).toBeInTheDocument();
+    });
     expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
 
     await userEvent.click(screen.getByRole("button", { name: /logout/i }));
@@ -38,6 +65,11 @@ describe("KanbanBoard", () => {
   it("renames a column", async () => {
     render(<KanbanBoard />);
     await signIn("user", "password");
+    
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+
     const column = getFirstColumn();
     const input = within(column).getByLabelText("Column title");
     await userEvent.clear(input);
@@ -48,6 +80,11 @@ describe("KanbanBoard", () => {
   it("adds and removes a card", async () => {
     render(<KanbanBoard />);
     await signIn("user", "password");
+    
+    await waitFor(() => {
+      expect(screen.getAllByTestId(/column-/i)).toHaveLength(5);
+    });
+
     const column = getFirstColumn();
     const addButton = within(column).getByRole("button", {
       name: /add a card/i,

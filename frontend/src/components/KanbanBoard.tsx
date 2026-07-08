@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
   DndContext,
   DragOverlay,
@@ -14,6 +14,12 @@ import {
 import { KanbanColumn } from "@/components/KanbanColumn";
 import { KanbanCardPreview } from "@/components/KanbanCardPreview";
 import { createId, initialData, moveCard, type BoardData } from "@/lib/kanban";
+import {
+  signIn as apiSignIn,
+  getBoard as apiGetBoard,
+  updateBoard as apiUpdateBoard,
+  type ApiError,
+} from "@/lib/api";
 
 const AUTH_USERNAME = "user";
 const AUTH_PASSWORD = "password";
@@ -22,8 +28,12 @@ export const KanbanBoard = () => {
   const [board, setBoard] = useState<BoardData>(() => initialData);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const [authForm, setAuthForm] = useState({ username: "", password: "" });
   const [authError, setAuthError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -32,6 +42,51 @@ export const KanbanBoard = () => {
   );
 
   const cardsById = useMemo(() => board.cards, [board.cards]);
+
+  // Load board from API when userId becomes available
+  useEffect(() => {
+    if (!userId || !isAuthenticated) {
+      return;
+    }
+
+    const loadBoard = async () => {
+      try {
+        setIsLoading(true);
+        setApiError(null);
+        const loadedBoard = await apiGetBoard(userId);
+        setBoard(loadedBoard);
+      } catch (error) {
+        const apiErr = error as ApiError;
+        setApiError(apiErr.message || "Failed to load board");
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadBoard();
+  }, [userId, isAuthenticated]);
+
+  // Sync board changes to API
+  useEffect(() => {
+    if (!userId || !isAuthenticated || isLoading) {
+      return;
+    }
+
+    // Debounce updates - wait 500ms after board changes before syncing
+    const syncTimer = setTimeout(async () => {
+      try {
+        setIsSyncing(true);
+        await apiUpdateBoard(userId, board);
+      } catch (error) {
+        const apiErr = error as ApiError;
+        setApiError(apiErr.message || "Failed to save board");
+      } finally {
+        setIsSyncing(false);
+      }
+    }, 500);
+
+    return () => clearTimeout(syncTimer);
+  }, [board, userId, isAuthenticated, isLoading]);
 
   const handleDragStart = (event: DragStartEvent) => {
     setActiveCardId(event.active.id as string);
@@ -95,24 +150,32 @@ export const KanbanBoard = () => {
     });
   };
 
-  const handleLogin = (event: FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    if (
-      authForm.username.trim() === AUTH_USERNAME &&
-      authForm.password === AUTH_PASSWORD
-    ) {
-      setIsAuthenticated(true);
-      setAuthError(null);
-      return;
-    }
+    setAuthError(null);
+    setApiError(null);
 
-    setAuthError("Invalid username or password.");
+    try {
+      setIsLoading(true);
+      const response = await apiSignIn(authForm.username, authForm.password);
+      setUserId(response.user_id);
+      setIsAuthenticated(true);
+      setAuthForm({ username: "", password: "" });
+    } catch (error) {
+      const apiErr = error as ApiError;
+      setAuthError(apiErr.message || "Failed to sign in");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleLogout = () => {
     setIsAuthenticated(false);
+    setUserId(null);
     setAuthForm({ username: "", password: "" });
     setAuthError(null);
+    setApiError(null);
+    setBoard(initialData);
   };
 
   const activeCard = activeCardId ? cardsById[activeCardId] : null;
@@ -138,10 +201,11 @@ export const KanbanBoard = () => {
                     username: event.target.value,
                   }))
                 }
-                className="mt-2 w-full rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm outline-none"
+                className="mt-2 w-full rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm outline-none disabled:opacity-50"
                 placeholder="user"
                 aria-label="Username"
                 required
+                disabled={isLoading}
               />
             </label>
             <label className="block text-sm font-semibold text-[var(--navy-dark)]">
@@ -155,10 +219,11 @@ export const KanbanBoard = () => {
                     password: event.target.value,
                   }))
                 }
-                className="mt-2 w-full rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm outline-none"
+                className="mt-2 w-full rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-4 py-3 text-sm outline-none disabled:opacity-50"
                 placeholder="password"
                 aria-label="Password"
                 required
+                disabled={isLoading}
               />
             </label>
             {authError ? (
@@ -166,11 +231,17 @@ export const KanbanBoard = () => {
                 {authError}
               </div>
             ) : null}
+            {apiError ? (
+              <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {apiError}
+              </div>
+            ) : null}
             <button
               type="submit"
-              className="w-full rounded-full bg-[var(--secondary-purple)] px-4 py-3 text-sm font-semibold uppercase tracking-wide text-white transition hover:brightness-110"
+              disabled={isLoading}
+              className="w-full rounded-full bg-[var(--secondary-purple)] px-4 py-3 text-sm font-semibold uppercase tracking-wide text-white transition hover:brightness-110 disabled:opacity-50"
             >
-              Sign in
+              {isLoading ? "Signing in..." : "Sign in"}
             </button>
           </form>
         </div>
@@ -201,10 +272,10 @@ export const KanbanBoard = () => {
             <div className="flex items-center justify-between rounded-2xl border border-[var(--stroke)] bg-[var(--surface)] px-5 py-4">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-[0.25em] text-[var(--gray-text)]">
-                  Focus
+                  Status
                 </p>
-                <p className="mt-2 text-lg font-semibold text-[var(--primary-blue)]">
-                  One board. Five columns. Zero clutter.
+                <p className="mt-2 text-sm font-semibold text-[var(--primary-blue)]">
+                  {isLoading ? "Loading..." : isSyncing ? "Saving..." : "Synced"}
                 </p>
               </div>
               <button
@@ -227,6 +298,11 @@ export const KanbanBoard = () => {
               </div>
             ))}
           </div>
+          {apiError ? (
+            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {apiError}
+            </div>
+          ) : null}
         </header>
 
         <DndContext

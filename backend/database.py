@@ -70,7 +70,7 @@ def init_db():
     conn.close()
 
 
-def seed_initial_board(user_id: str) -> str:
+def seed_initial_board(user_id: str, conn: sqlite3.Connection | None = None) -> str:
     """Create an initial board for a new user with demo data."""
     # Demo board data matching frontend structure
     board_data = {
@@ -130,18 +130,24 @@ def seed_initial_board(user_id: str) -> str:
     }
 
     board_id = f"board-{user_id}"
-    conn = get_db()
-    cursor = conn.cursor()
-
-    cursor.execute(
-        """
-        INSERT INTO boards (id, user_id, title, board_data)
-        VALUES (?, ?, ?, ?)
-        """,
-        (board_id, user_id, "My Board", json.dumps(board_data)),
-    )
-
-    conn.commit()
-    conn.close()
+    should_close = False
+    
+    if conn is None:
+        conn = get_db()
+        should_close = True
+    
+    try:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            INSERT INTO boards (id, user_id, title, board_data)
+            VALUES (?, ?, ?, ?)
+            """,
+            (board_id, user_id, "My Board", json.dumps(board_data)),
+        )
+        conn.commit()
+    finally:
+        if should_close:
+            conn.close()
 
     return board_id

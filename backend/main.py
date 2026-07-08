@@ -79,7 +79,8 @@ def signin(request: SignInRequest) -> SignInResponse:
         existing_board = cursor.fetchone()
 
         if not existing_board:
-            seed_initial_board(user_id)
+            # Pass connection to avoid opening a second one
+            seed_initial_board(user_id, conn)
 
         conn.commit()
     finally:
