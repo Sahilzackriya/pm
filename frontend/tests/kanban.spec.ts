@@ -82,3 +82,72 @@ test("moves a card between columns", async ({ page }) => {
   await page.mouse.up();
   await expect(targetColumn.getByTestId("card-card-1")).toBeVisible();
 });
+
+test("moves a card into an empty column", async ({ page }) => {
+  await login(page);
+  const sourceCard = page.getByTestId("card-card-1");
+  const targetColumn = page.getByTestId("column-col-discovery");
+
+  for (const deleteButton of await targetColumn
+    .getByRole("button", { name: /^delete /i })
+    .all()) {
+    await deleteButton.click();
+  }
+  await expect(targetColumn.getByText("Drop a card here")).toBeVisible();
+
+  const cardBox = await sourceCard.boundingBox();
+  const emptyTargetBox = await targetColumn
+    .getByText("Drop a card here")
+    .boundingBox();
+  if (!cardBox || !emptyTargetBox) {
+    throw new Error("Unable to resolve drag coordinates.");
+  }
+
+  await page.mouse.move(
+    cardBox.x + cardBox.width / 2,
+    cardBox.y + cardBox.height / 2
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    emptyTargetBox.x + emptyTargetBox.width / 2,
+    emptyTargetBox.y + emptyTargetBox.height / 2,
+    { steps: 12 }
+  );
+  await page.mouse.up();
+
+  await expect(targetColumn.getByTestId("card-card-1")).toBeVisible();
+});
+
+test("sends a chat prompt and reflects an AI board update", async ({ page }) => {
+  await page.route("**/api/chat", async (route) => {
+    const request = route.request().postDataJSON();
+    expect(request.message).toBe("Rename the first card");
+    expect(request.user_id).toBe("user-default");
+
+    const boardResponse = await page.request.get(
+      "http://127.0.0.1:8100/api/boards?user_id=user-default"
+    );
+    const board = await boardResponse.json();
+    board.cards["card-1"].title = "AI renamed card";
+
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        response: "I renamed the first card.",
+        model: "openai/gpt-oss-120b",
+        board_updated: true,
+        board,
+      }),
+    });
+  });
+
+  await login(page);
+  await page.getByLabel("Message the board assistant").fill(
+    "Rename the first card"
+  );
+  await page.getByRole("button", { name: "Send message" }).click();
+
+  await expect(page.getByText("I renamed the first card.")).toBeVisible();
+  await expect(page.getByText("AI renamed card")).toBeVisible();
+});

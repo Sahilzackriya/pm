@@ -133,6 +133,12 @@ Implementation notes:
 - FastAPI allows CORS from `http://127.0.0.1:3000` and `http://localhost:3000` for local frontend development.
 - Playwright starts both FastAPI and Next.js for integration tests. It uses `PM_DB_PATH=frontend/test-results/e2e.db` so e2e tests do not modify the main `pm.db`.
 - Playwright can use an installed browser channel with `PLAYWRIGHT_BROWSER_CHANNEL=chrome` when the managed Playwright browser is not installed.
+- Drag collision detection prioritizes the column or card directly under the pointer,
+  with closest-corner fallback for non-pointer input. This allows cards to be dropped
+  reliably into empty columns.
+- Playwright uses dedicated ports `3100` and `8100`, a separate `.next-e2e` build
+  directory, and `reuseExistingServer: false` so tests cannot attach to or modify a
+  running development app.
 
 ## Part 8: AI connectivity
 
@@ -199,10 +205,10 @@ Implementation decisions:
 
 Goal: Add a polished AI chat sidebar that can update the Kanban board.
 
-- [ ] Build chat sidebar UI for history and prompt input.
-- [ ] Connect to backend AI endpoint.
-- [ ] Refresh the board automatically when AI updates state.
-- [ ] Add end-to-end tests for chat and updates.
+- [x] Build chat sidebar UI for history and prompt input.
+- [x] Connect to backend AI endpoint.
+- [x] Refresh the board automatically when AI updates state.
+- [x] Add end-to-end tests for chat and updates.
 
 Tests:
 - Playwright test for send prompt, receive response, and board refresh.
@@ -211,6 +217,18 @@ Tests:
 Success criteria:
 - Chat sidebar works end to end.
 - AI-driven board updates are visible and reflected.
+
+Implementation decisions:
+- The assistant is a fixed right sidebar on desktop and follows the board on
+  smaller screens.
+- Conversation history is session-only for the MVP and is sent with each prompt.
+- The frontend applies the validated board returned by `/api/chat` immediately;
+  the backend has already persisted that board before responding.
+- Chat includes empty, sending, error, transcript, and clear-conversation states.
+- Enter sends a message and Shift+Enter adds a new line.
+- Desktop and mobile layouts were visually verified with installed Chrome.
+- Frontend validation passes: 18 unit tests, 6 Playwright tests, ESLint, and the
+  production Next.js build.
 
 ---
 

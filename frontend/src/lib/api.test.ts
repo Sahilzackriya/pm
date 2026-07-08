@@ -3,6 +3,7 @@ import {
   signIn,
   getBoard,
   updateBoard,
+  sendChat,
   type SignInResponse,
 } from "@/lib/api";
 import type { BoardData } from "@/lib/kanban";
@@ -33,7 +34,7 @@ describe("API client", () => {
         token: "token-abc",
       };
 
-      (global.fetch as any).mockResolvedValueOnce({
+      vi.mocked(global.fetch).mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       });
@@ -53,7 +54,7 @@ describe("API client", () => {
     });
 
     it("throws error on signin failure", async () => {
-      (global.fetch as any).mockResolvedValueOnce({
+      vi.mocked(global.fetch).mockResolvedValueOnce({
         ok: false,
         status: 401,
         json: async () => ({ detail: "Invalid credentials" }),
@@ -68,7 +69,7 @@ describe("API client", () => {
 
   describe("getBoard", () => {
     it("fetches board for user", async () => {
-      (global.fetch as any).mockResolvedValueOnce({
+      vi.mocked(global.fetch).mockResolvedValueOnce({
         ok: true,
         json: async () => mockBoardData,
       });
@@ -82,7 +83,7 @@ describe("API client", () => {
     });
 
     it("throws error on getBoard failure", async () => {
-      (global.fetch as any).mockResolvedValueOnce({
+      vi.mocked(global.fetch).mockResolvedValueOnce({
         ok: false,
         status: 404,
         json: async () => ({ detail: "Board not found" }),
@@ -97,7 +98,7 @@ describe("API client", () => {
 
   describe("updateBoard", () => {
     it("sends board update to backend", async () => {
-      (global.fetch as any).mockResolvedValueOnce({
+      vi.mocked(global.fetch).mockResolvedValueOnce({
         ok: true,
         json: async () => ({ success: true }),
       });
@@ -120,7 +121,7 @@ describe("API client", () => {
     });
 
     it("throws error on updateBoard failure", async () => {
-      (global.fetch as any).mockResolvedValueOnce({
+      vi.mocked(global.fetch).mockResolvedValueOnce({
         ok: false,
         status: 500,
         json: async () => ({ detail: "Server error" }),
@@ -130,6 +131,40 @@ describe("API client", () => {
         status: 500,
         message: "Server error",
       });
+    });
+  });
+
+  describe("sendChat", () => {
+    it("sends the prompt, history, and user to the chat endpoint", async () => {
+      const mockResponse = {
+        response: "Moved the card.",
+        model: "openai/gpt-oss-120b",
+        board_updated: true,
+        board: mockBoardData,
+      };
+      vi.mocked(global.fetch).mockResolvedValueOnce({
+        ok: true,
+        json: async () => mockResponse,
+      });
+
+      const history = [
+        { role: "assistant" as const, content: "How can I help?" },
+      ];
+      const result = await sendChat("user-123", "Move the card", history);
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        "/api/chat",
+        expect.objectContaining({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: "Move the card",
+            history,
+            user_id: "user-123",
+          }),
+        })
+      );
+      expect(result).toEqual(mockResponse);
     });
   });
 });

@@ -21,13 +21,19 @@ describe("KanbanBoard", () => {
     vi.clearAllMocks();
     window.sessionStorage.clear();
     // Mock successful API responses
-    (api.signIn as any).mockResolvedValue({
+    vi.mocked(api.signIn).mockResolvedValue({
       user_id: "user-default",
       username: "user",
       token: "token-123",
     });
-    (api.getBoard as any).mockResolvedValue(initialData);
-    (api.updateBoard as any).mockResolvedValue({ success: true });
+    vi.mocked(api.getBoard).mockResolvedValue(initialData);
+    vi.mocked(api.updateBoard).mockResolvedValue({ success: true });
+    vi.mocked(api.sendChat).mockResolvedValue({
+      response: "I can help with that.",
+      model: "openai/gpt-oss-120b",
+      board_updated: false,
+      board: null,
+    });
   });
 
   it("shows login screen before authentication", () => {
@@ -37,7 +43,7 @@ describe("KanbanBoard", () => {
   });
 
   it("rejects invalid credentials", async () => {
-    (api.signIn as any).mockRejectedValueOnce({
+    vi.mocked(api.signIn).mockRejectedValueOnce({
       status: 401,
       message: "Invalid credentials",
     });
@@ -122,5 +128,55 @@ describe("KanbanBoard", () => {
     await userEvent.click(deleteButton);
 
     expect(within(column).queryByText("New card")).not.toBeInTheDocument();
+  });
+
+  it("sends chat history and applies an AI board update", async () => {
+    const updatedBoard = structuredClone(initialData);
+    updatedBoard.cards["card-1"].title = "Renamed by AI";
+    vi.mocked(api.sendChat).mockResolvedValueOnce({
+      response: "I renamed the card.",
+      model: "openai/gpt-oss-120b",
+      board_updated: true,
+      board: updatedBoard,
+    });
+
+    render(<KanbanBoard />);
+    await signIn("user", "password");
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /board assistant/i })).toBeInTheDocument();
+    });
+
+    await userEvent.type(
+      screen.getByLabelText(/message the board assistant/i),
+      "Rename the first card"
+    );
+    await userEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    await waitFor(() => {
+      expect(screen.getByText("I renamed the card.")).toBeInTheDocument();
+    });
+    expect(api.sendChat).toHaveBeenCalledWith(
+      "user-default",
+      "Rename the first card",
+      []
+    );
+    expect(screen.getByText("Renamed by AI")).toBeInTheDocument();
+  });
+
+  it("shows chat request errors", async () => {
+    vi.mocked(api.sendChat).mockRejectedValueOnce(new Error("AI unavailable"));
+    render(<KanbanBoard />);
+    await signIn("user", "password");
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /board assistant/i })).toBeInTheDocument();
+    });
+
+    await userEvent.type(
+      screen.getByLabelText(/message the board assistant/i),
+      "Help"
+    );
+    await userEvent.click(screen.getByRole("button", { name: /send message/i }));
+
+    expect(await screen.findByText("AI unavailable")).toBeInTheDocument();
   });
 });

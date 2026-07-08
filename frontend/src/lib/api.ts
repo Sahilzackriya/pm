@@ -11,6 +11,18 @@ export type ApiError = {
   status: number;
 };
 
+export type ChatMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+export type ChatResponse = {
+  response: string;
+  model: string;
+  board_updated: boolean;
+  board: BoardData | null;
+};
+
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL ?? "/api";
 
 async function handleResponse(response: Response) {
@@ -70,6 +82,24 @@ export async function updateBoard(
       }),
     }
   );
+
+  return handleResponse(response);
+}
+
+export async function sendChat(
+  userId: string,
+  message: string,
+  history: ChatMessage[]
+): Promise<ChatResponse> {
+  const response = await fetch(`${API_BASE}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      message,
+      history,
+      user_id: userId,
+    }),
+  });
 
   return handleResponse(response);
 }
