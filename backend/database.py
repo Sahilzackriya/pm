@@ -6,9 +6,22 @@ from pathlib import Path
 
 DB_PATH = Path(__file__).parent.parent / "pm.db"
 
+# Shared in-memory connection for testing
+_test_conn = None
+
 
 def get_db() -> sqlite3.Connection:
     """Get a database connection."""
+    global _test_conn
+    
+    # For in-memory testing, use shared connection
+    if str(DB_PATH) == ":memory:":
+        if _test_conn is None:
+            _test_conn = sqlite3.connect(":memory:", check_same_thread=False)
+            _test_conn.row_factory = sqlite3.Row
+        return _test_conn
+    
+    # Normal file-based connection
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     return conn
