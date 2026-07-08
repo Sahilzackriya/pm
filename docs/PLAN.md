@@ -138,10 +138,10 @@ Implementation notes:
 
 Goal: Connect backend to OpenRouter for AI request handling.
 
-- [ ] Implement OpenRouter client code in backend.
-- [ ] Add a simple AI endpoint for sanity checks.
-- [ ] Validate with a test call such as `2+2`.
-- [ ] Manage API key through `.env`.
+- [x] Implement OpenRouter client code in backend.
+- [x] Add `/api/chat` for AI sanity checks.
+- [x] Validate with a test call such as `2+2`.
+- [x] Manage API key through `.env`.
 
 Tests:
 - Backend test for AI request flow.
@@ -150,6 +150,16 @@ Tests:
 Success criteria:
 - AI endpoint works and returns a valid response.
 - OpenRouter integration is documented.
+
+Implementation decisions:
+- Part 8 should call OpenRouter directly for validation rather than using a mocked AI response.
+- The MVP chat endpoint is `POST /api/chat`.
+- The model is hardcoded to `openai/gpt-oss-120b` for now.
+- Keep the initial client simple and dependency-free unless a concrete issue requires adding a package.
+- Read `OPENROUTER_API_KEY` from the process environment or the project root `.env`.
+- Current implementation uses Python standard library HTTP calls and returns `response` plus the hardcoded model name.
+- Live validation is implemented as a real `/api/chat` test and is skipped only when `OPENROUTER_API_KEY` is unavailable. No mocked OpenRouter response is used for this check.
+- Live validation passed against OpenRouter with the `2+2` prompt.
 
 ## Part 9: Structured AI board updates
 

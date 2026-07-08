@@ -11,6 +11,7 @@ from pydantic import BaseModel
 
 from backend.auth import verify_credentials, create_session_token
 from backend.database import init_db, get_db, seed_initial_board
+from backend.openrouter import OPENROUTER_MODEL, OpenRouterError, ask_openrouter
 
 # ============================================================================
 # Request/Response Models
@@ -31,6 +32,15 @@ class SignInResponse(BaseModel):
 class BoardUpdateRequest(BaseModel):
     columns: list
     cards: dict
+
+
+class ChatRequest(BaseModel):
+    message: str
+
+
+class ChatResponse(BaseModel):
+    response: str
+    model: str
 
 
 # ============================================================================
@@ -149,6 +159,26 @@ def update_board(request: BoardUpdateRequest, user_id: str = "user-default") -> 
         return {"success": True}
     finally:
         conn.close()
+
+
+# ============================================================================
+# AI Routes
+# ============================================================================
+
+
+@app.post("/api/chat")
+def chat(request: ChatRequest) -> ChatResponse:
+    """Send a simple chat prompt to OpenRouter."""
+    message = request.message.strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    try:
+        response = ask_openrouter(message)
+    except OpenRouterError as error:
+        raise HTTPException(status_code=502, detail=str(error)) from error
+
+    return ChatResponse(response=response, model=OPENROUTER_MODEL)
 
 
 # ============================================================================
